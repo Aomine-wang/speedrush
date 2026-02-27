@@ -144,10 +144,10 @@ async function settleTrade(trade, opts = {}) {
     profit = 0;
     vault.balance += trade.amount;
   } else if (pnl >= 0) {
-    // profit: refund principal + profit
+    // profit: refund principal only (profit converts to distance only)
     profit = pnl;
-    refund = trade.amount + profit;
-  } else {
+    refund = trade.amount;
+  } else { 
     // partial loss: loss part to vault, refund rest
     loss = Math.min(trade.amount, -pnl);
     refund = trade.amount - loss;
