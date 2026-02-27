@@ -29,7 +29,7 @@ app.use('/api/trade', historyRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', version: '2.1', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', version: '2.2', timestamp: new Date().toISOString() });
 });
 
 // Test login endpoint (temporary)
