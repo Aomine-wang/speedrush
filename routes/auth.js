@@ -5,11 +5,11 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Export users for other modules
-module.exports.users = users;
-
 // Mock database (replace with Firebase in production)
 const users = {};
+
+// Export users for other modules
+module.exports.users = users;
 
 // Direct login - no signature required (for demo purposes)
 router.post('/login-direct', (req, res) => {
