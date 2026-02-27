@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
-// Mock database
-const users = require('./auth').users || {};
+// Import users from auth module
+const authModule = require('./auth');
+let users = authModule.users || {};
 const trades = [];
 const LEADERBOARD = [];
 

@@ -5,8 +5,51 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// Export users for other modules
+module.exports.users = users;
+
 // Mock database (replace with Firebase in production)
 const users = {};
+
+// Direct login - no signature required (for demo purposes)
+router.post('/login-direct', (req, res) => {
+  const { walletAddress } = req.body;
+  
+  if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+    return res.status(400).json({ error: 'Invalid wallet address' });
+  }
+  
+  // Create or get user
+  if (!users[walletAddress]) {
+    users[walletAddress] = {
+      walletAddress,
+      nonce: Math.floor(Math.random() * 1000000).toString(),
+      demoBalance: 10000,
+      realBalance: 0,
+      totalDistance: 0,
+      createdAt: new Date()
+    };
+  }
+  
+  const user = users[walletAddress];
+  
+  // Generate JWT
+  const token = jwt.sign(
+    { walletAddress, demoBalance: user.demoBalance },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  
+  res.json({
+    token,
+    user: {
+      walletAddress: user.walletAddress,
+      demoBalance: user.demoBalance,
+      realBalance: user.realBalance,
+      totalDistance: user.totalDistance
+    }
+  });
+});
 
 // Generate nonce for wallet signature
 router.post('/nonce', (req, res) => {
