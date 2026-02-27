@@ -77,9 +77,10 @@ router.post('/', (req, res) => {
       return;
     }
 
-    // Use the same price source used by settlement: priceService keeps global.currentBTCPrice updated
-    const current = global.currentBTCPrice;
-    if (!current) return; // wait until we have a price
+    // Use unified price source
+    const priceService = require('../services/priceService');
+    const current = priceService.getCurrentPrice();
+    if (!current) return;
 
     const pnlUtil = require('../services/pnl');
     const pnlNow = pnlUtil.computePnl(trade, current);
@@ -116,7 +117,8 @@ router.post('/', (req, res) => {
 async function settleTrade(trade, opts = {}) {
   if (trade.status !== 'open') return;
   
-  const exitPrice = global.currentBTCPrice || 67234.56;
+  const priceService = require('../services/priceService');
+  const exitPrice = priceService.getCurrentPrice() || global.currentBTCPrice || 67234.56;
   const priceChange = (exitPrice - trade.entryPrice) / trade.entryPrice;
   
   // PnL with fixed 10000x leverage

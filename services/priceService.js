@@ -26,7 +26,10 @@ function simulatePrice() {
 // Start price updates
 function start() {
   console.log('Price service started');
-  
+
+  // initialize global price immediately
+  global.currentBTCPrice = currentPrice;
+
   // Update price every 3 seconds
   setInterval(simulatePrice, 3000);
   
