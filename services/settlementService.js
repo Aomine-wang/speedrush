@@ -1,6 +1,7 @@
 const cron = require('node-cron');
-const { vault } = require('../routes/vault');
-const { users } = require('../routes/auth');
+const state = require('../state');
+const vault = state.vault;
+const users = state.users;
 
 // Daily settlement at 00:00 UTC
 // Rule:

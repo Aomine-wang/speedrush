@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
 
-// In-memory vault
-const vault = {
-  balance: 0
-};
+const state = require('../state');
+const vault = state.vault;
 
 router.get('/', (req, res) => {
   res.json({ vaultBalance: vault.balance });
 });
 
 module.exports = router;
-module.exports.vault = vault;

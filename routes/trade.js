@@ -1,16 +1,11 @@
 const express = require('express');
 const router = express.Router();
 
-// Import users from auth module (shared in-memory object)
-const authModule = require('./auth');
-// users is an object keyed by walletAddress
-const users = authModule.users || {};
-const trades = [];
-const LEADERBOARD = [];
-
-// Vault shared module
-const vaultModule = require('./vault');
-const vault = vaultModule.vault;
+const state = require('../state');
+const users = state.users;
+const trades = state.trades;
+const LEADERBOARD = state.leaderboard;
+const vault = state.vault;
 
 // Place order (handle /trade endpoint)
 router.post('/', (req, res) => {
@@ -35,13 +30,11 @@ router.post('/', (req, res) => {
   
   const { direction, amount } = req.body;
 
-  // always read latest users object from auth module (avoid stale reference)
-  const usersDb = authModule.users;
-  if (!usersDb || !usersDb[walletAddress]) {
+  if (!users[walletAddress]) {
     return res.status(404).json({ error: 'User not found' });
   }
   
-  const user = usersDb[walletAddress];
+  const user = users[walletAddress];
 
   const amt = Number(amount);
   const lev = 10000; // fixed leverage per product rule
@@ -145,8 +138,7 @@ async function settleTrade(trade) {
   trade.refund = Number(refund.toFixed(2));
   trade.settledAt = new Date();
 
-  const usersDb = authModule.users;
-  const user = usersDb ? usersDb[trade.walletAddress] : undefined;
+  const user = users[trade.walletAddress];
   if (user) {
     user.demoBalance += refund;
 
