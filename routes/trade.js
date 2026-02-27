@@ -133,11 +133,17 @@ async function settleTrade(trade, opts = {}) {
     pnl = 0;
   }
 
-  // Explosion guard: cap to principal range
-  // profit can be large, but keep game stable
+  // Explosion guard: cap losses to principal; allow profit up to 5x principal
   const maxProfit = trade.amount * 5;
-  const maxLoss = trade.amount; // can't lose more than principal (unless liquidation)
+  const maxLoss = trade.amount;
   pnl = Math.min(maxProfit, Math.max(-maxLoss, pnl));
+
+  // Win bias: make it easier to hit a positive profit (for demo/game feel)
+  // (keeps liquidation rules intact)
+  if (pnl > -trade.amount * 0.7) {
+    pnl = pnl + trade.amount * 0.25; // +25% principal boost
+    pnl = Math.min(maxProfit, Math.max(-maxLoss, pnl));
+  }
 
   // Liquidation check: if loss >= 70% principal => immediate liquidation
   const liquidationLoss = trade.amount * 0.7;
