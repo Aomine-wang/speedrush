@@ -76,9 +76,17 @@ router.post('/', (req, res) => {
       clearInterval(interval);
       return;
     }
-    const current = global.currentBTCPrice || trade.entryPrice;
+
+    // Use the same price source used by settlement: priceService keeps global.currentBTCPrice updated
+    const current = global.currentBTCPrice;
+    if (!current) return; // wait until we have a price
+
     const pnlUtil = require('../services/pnl');
     const pnlNow = pnlUtil.computePnl(trade, current);
+
+    // Debug: store last check for client display
+    trade._lastCheck = { at: Date.now(), price: current, pnl: pnlNow };
+
     if (-pnlNow >= trade.amount * 0.7) {
       clearInterval(interval);
       settleTrade(trade, { forceLiquidation: true });
@@ -175,7 +183,7 @@ async function settleTrade(trade, opts = {}) {
     updateLeaderboard(user);
   }
 
-  console.log(`Trade ${trade.id} settled. pnl=${trade.pnl} liquidated=${isLiquidated}`);
+  console.log(`Trade ${trade.id} settled. pnl=${trade.pnl} liquidated=${isLiquidated} profit=${trade.profit} distance=${user ? user.totalDistance : 'na'}`);
 }
 
 // Update leaderboard
@@ -201,10 +209,18 @@ function updateLeaderboard(user) {
 }
 
 // Get trade history
-router.get('/history', (req, res) => {
-  const { walletAddress } = req.query;
-  const userTrades = trades.filter(t => t.walletAddress === walletAddress);
-  res.json(userTrades);
+// debug: view open positions (admin-lite)
+router.get('/open', (req, res) => {
+  const open = trades.filter(t => t.status === 'open').map(t => ({
+    id: t.id,
+    walletAddress: t.walletAddress,
+    direction: t.direction,
+    amount: t.amount,
+    entryPrice: t.entryPrice,
+    createdAt: t.createdAt,
+    lastCheck: t._lastCheck || null,
+  }));
+  res.json({ open });
 });
 
 // Export leaderboard for other routes
