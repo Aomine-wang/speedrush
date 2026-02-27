@@ -3,7 +3,8 @@ const router = express.Router();
 
 // Import users from auth module (shared in-memory object)
 const authModule = require('./auth');
-const users = authModule.users;
+// users is an object keyed by walletAddress
+const users = authModule.users || {};
 const trades = [];
 const LEADERBOARD = [];
 
