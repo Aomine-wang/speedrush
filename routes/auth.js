@@ -32,10 +32,13 @@ router.post('/login-direct', (req, res) => {
   const user = users[walletAddress];
   
   // Generate JWT
+  // New device login kicks old device: rotate sessionId
+  user.sessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
   const token = jwt.sign(
-    { walletAddress, demoBalance: user.demoBalance },
+    { walletAddress, demoBalance: user.demoBalance, sessionId: user.sessionId },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '1d' }
   );
   
   res.json({
@@ -73,28 +76,30 @@ router.post('/nonce', (req, res) => {
 // Verify signature and login (also handle /verify endpoint)
 router.post('/verify', async (req, res) => {
   const { walletAddress, signature } = req.body;
-  
+
   try {
     const user = users[walletAddress];
     if (!user) {
       return res.status(400).json({ error: 'User not found' });
     }
-    
+
     // Verify signature
     const message = `SpeedRush Login\nNonce: ${user.nonce}`;
     const recoveredAddress = ethers.verifyMessage(message, signature);
-    
+
     if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
       return res.status(401).json({ error: 'Invalid signature' });
     }
-    
-    // Generate JWT
+
+    // New device login kicks old device: rotate sessionId
+    user.sessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
     const token = jwt.sign(
-      { walletAddress, demoBalance: user.demoBalance },
+      { walletAddress, demoBalance: user.demoBalance, sessionId: user.sessionId },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '1d' }
     );
-    
+
     res.json({
       token,
       user: {
@@ -113,28 +118,30 @@ router.post('/verify', async (req, res) => {
 // Keep /login for backward compatibility
 router.post('/login', async (req, res) => {
   const { walletAddress, signature } = req.body;
-  
+
   try {
     const user = users[walletAddress];
     if (!user) {
       return res.status(400).json({ error: 'User not found' });
     }
-    
+
     // Verify signature
     const message = `Login to SpeedRush with nonce: ${user.nonce}`;
     const recoveredAddress = ethers.verifyMessage(message, signature);
-    
+
     if (recoveredAddress.toLowerCase() !== walletAddress.toLowerCase()) {
       return res.status(401).json({ error: 'Invalid signature' });
     }
-    
-    // Generate JWT
+
+    // New device login kicks old device: rotate sessionId
+    user.sessionId = Math.random().toString(36).slice(2) + Date.now().toString(36);
+
     const token = jwt.sign(
-      { walletAddress, demoBalance: user.demoBalance },
+      { walletAddress, demoBalance: user.demoBalance, sessionId: user.sessionId },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '1d' }
     );
-    
+
     res.json({
       token,
       user: {
@@ -178,6 +185,17 @@ function authenticateToken(req, res, next) {
     if (err) {
       return res.status(403).json({ error: 'Invalid token' });
     }
+
+    const user = users[decoded.walletAddress];
+    if (!user) {
+      return res.status(403).json({ error: 'Invalid session' });
+    }
+
+    // Single-device login: sessionId must match latest
+    if (decoded.sessionId && user.sessionId && decoded.sessionId !== user.sessionId) {
+      return res.status(401).json({ error: 'Logged in elsewhere' });
+    }
+
     req.walletAddress = decoded.walletAddress;
     next();
   });

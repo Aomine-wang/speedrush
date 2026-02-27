@@ -8,6 +8,7 @@ const authRoutes = require('./routes/auth');
 const tradeRoutes = require('./routes/trade');
 const leaderboardRoutes = require('./routes/leaderboard');
 const vaultRoutes = require('./routes/vault');
+const historyRoutes = require('./routes/history');
 const priceService = require('./services/priceService');
 const settlementService = require('./services/settlementService');
 
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/trade', tradeRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/vault', vaultRoutes);
+app.use('/api/trade', historyRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

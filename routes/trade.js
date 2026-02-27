@@ -24,6 +24,12 @@ router.post('/', (req, res) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     walletAddress = decoded.walletAddress;
+
+    // single-device session check
+    const user = users[walletAddress];
+    if (!user || (decoded.sessionId && user.sessionId && decoded.sessionId !== user.sessionId)) {
+      return res.status(401).json({ error: 'Logged in elsewhere' });
+    }
   } catch (err) {
     return res.status(403).json({ error: 'Invalid token' });
   }
