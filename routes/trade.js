@@ -69,6 +69,25 @@ router.post('/', (req, res) => {
   
   trades.push(trade);
   
+  // Liquidation early-check loop (every 1s up to 30s)
+  trade._timerStartedAt = Date.now();
+  const interval = setInterval(() => {
+    if (trade.status !== 'open') {
+      clearInterval(interval);
+      return;
+    }
+    const current = global.currentBTCPrice || trade.entryPrice;
+    const pnlUtil = require('../services/pnl');
+    const pnlNow = pnlUtil.computePnl(trade, current);
+    if (-pnlNow >= trade.amount * 0.7) {
+      clearInterval(interval);
+      settleTrade(trade, { forceLiquidation: true });
+    }
+    if (Date.now() - trade._timerStartedAt >= 30000) {
+      clearInterval(interval);
+    }
+  }, 1000);
+
   // Auto settle after 30 seconds
   setTimeout(() => settleTrade(trade), 30000);
 
@@ -86,7 +105,7 @@ router.post('/', (req, res) => {
 });
 
 // Settle trade
-async function settleTrade(trade) {
+async function settleTrade(trade, opts = {}) {
   if (trade.status !== 'open') return;
   
   const exitPrice = global.currentBTCPrice || 67234.56;
@@ -112,7 +131,7 @@ async function settleTrade(trade) {
 
   // Liquidation check: if loss >= 70% principal => immediate liquidation
   const liquidationLoss = trade.amount * 0.7;
-  const isLiquidated = (-pnl) >= liquidationLoss;
+  const isLiquidated = opts.forceLiquidation ? true : ((-pnl) >= liquidationLoss);
 
   let refund = 0;
   let profit = 0;
