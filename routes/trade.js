@@ -7,6 +7,10 @@ let users = authModule.users || {};
 const trades = [];
 const LEADERBOARD = [];
 
+// Vault shared module
+const vaultModule = require('./vault');
+const vault = vaultModule.vault;
+
 // Place order (handle /trade endpoint)
 router.post('/', (req, res) => {
   const authHeader = req.headers['authorization'];
@@ -33,21 +37,27 @@ router.post('/', (req, res) => {
   }
   
   const user = users[walletAddress];
-  const totalCost = amount + 0.1; // amount + fee
-  
-  if (user.demoBalance < totalCost) {
+
+  const amt = Number(amount);
+  const lev = 10000; // fixed leverage per product rule
+  if (!Number.isFinite(amt) || amt <= 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+
+  if (user.demoBalance < amt) {
     return res.status(400).json({ error: 'Insufficient balance' });
   }
-  
-  // Deduct balance
-  user.demoBalance -= totalCost;
+
+  // Freeze / deduct principal
+  user.demoBalance -= amt;
   
   // Create trade
   const trade = {
     id: Date.now().toString(),
     walletAddress,
-    direction, // 'long' or 'short'
-    amount,
+    direction: (direction || '').toUpperCase(), // 'LONG' | 'SHORT'
+    amount: amt,
+    leverage: lev,
     entryPrice: global.currentBTCPrice || 67234.56,
     status: 'open',
     createdAt: new Date()
@@ -57,10 +67,12 @@ router.post('/', (req, res) => {
   
   // Auto settle after 30 seconds
   setTimeout(() => settleTrade(trade), 30000);
-  
+
   res.json({
-    tradeId: trade.id,
-    message: 'Order placed successfully',
+    success: true,
+    trade,
+    newBalance: user.demoBalance,
+    vaultBalance: vault.balance,
     settlementIn: 30
   });
 });
@@ -72,35 +84,71 @@ async function settleTrade(trade) {
   const exitPrice = global.currentBTCPrice || 67234.56;
   const priceChange = (exitPrice - trade.entryPrice) / trade.entryPrice;
   
-  let profit = 0;
-  if (trade.direction === 'long') {
-    profit = priceChange * 10000 * trade.amount;
+  // PnL with fixed 10000x leverage
+  const lev = trade.leverage || 10000;
+  let pnl = 0;
+  if (trade.direction === 'LONG') {
+    pnl = priceChange * lev * trade.amount;
+  } else if (trade.direction === 'SHORT') {
+    pnl = -priceChange * lev * trade.amount;
   } else {
-    profit = -priceChange * 10000 * trade.amount;
+    // invalid direction -> treat as flat
+    pnl = 0;
   }
-  
-  // Cap profit/loss
-  profit = Math.max(-trade.amount * 2, Math.min(profit, 50));
-  
+
+  // Explosion guard: cap to principal range
+  // profit can be large, but keep game stable
+  const maxProfit = trade.amount * 5;
+  const maxLoss = trade.amount; // can't lose more than principal (unless liquidation)
+  pnl = Math.min(maxProfit, Math.max(-maxLoss, pnl));
+
+  // Liquidation check: if loss >= 70% principal => immediate liquidation
+  const liquidationLoss = trade.amount * 0.7;
+  const isLiquidated = (-pnl) >= liquidationLoss;
+
+  let refund = 0;
+  let profit = 0;
+  let loss = 0;
+
+  if (isLiquidated) {
+    // all principal to vault
+    loss = trade.amount;
+    refund = 0;
+    profit = 0;
+    vault.balance += trade.amount;
+  } else if (pnl >= 0) {
+    // profit: refund principal + profit
+    profit = pnl;
+    refund = trade.amount + profit;
+  } else {
+    // partial loss: loss part to vault, refund rest
+    loss = Math.min(trade.amount, -pnl);
+    refund = trade.amount - loss;
+    vault.balance += loss;
+  }
+
   trade.status = 'closed';
   trade.exitPrice = exitPrice;
-  trade.profit = profit;
+  trade.pnl = Number(pnl.toFixed(2));
+  trade.profit = Number(profit.toFixed(2));
+  trade.loss = Number(loss.toFixed(2));
+  trade.liquidated = isLiquidated;
+  trade.refund = Number(refund.toFixed(2));
   trade.settledAt = new Date();
-  
+
   const user = users[trade.walletAddress];
   if (user) {
-    user.demoBalance += trade.amount + profit;
-    
-    // Update distance (1m per 1 USDT profit)
+    user.demoBalance += refund;
+
+    // distance: +1m per 1 USDT profit
     if (profit > 0) {
       user.totalDistance += Math.floor(profit);
     }
-    
-    // Update leaderboard
+
     updateLeaderboard(user);
   }
-  
-  console.log(`Trade ${trade.id} settled. Profit: ${profit.toFixed(2)} USDT`);
+
+  console.log(`Trade ${trade.id} settled. pnl=${trade.pnl} liquidated=${isLiquidated}`);
 }
 
 // Update leaderboard

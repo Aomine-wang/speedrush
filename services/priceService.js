@@ -8,13 +8,16 @@ let priceCallback = null;
 function simulatePrice() {
   const change = (Math.random() - 0.5) * 100;
   currentPrice += change;
-  
+
+  // keep global price for trade settlement
+  global.currentBTCPrice = currentPrice;
+
   if (priceCallback) {
     priceCallback({
       symbol: 'BTCUSDT',
-      price: currentPrice.toFixed(2),
-      change: change.toFixed(2),
-      changePercent: ((change / currentPrice) * 100).toFixed(2),
+      price: Number(currentPrice.toFixed(2)),
+      change: Number(change.toFixed(2)),
+      changePercent: Number(((change / currentPrice) * 100).toFixed(2)),
       timestamp: Date.now()
     });
   }
