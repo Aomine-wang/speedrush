@@ -6,10 +6,27 @@ const users = require('./auth').users || {};
 const trades = [];
 const LEADERBOARD = [];
 
-// Place order
-router.post('/order', (req, res) => {
-  const { walletAddress, direction, amount } = req.body;
+// Place order (handle /trade endpoint)
+router.post('/', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
   
+  if (!token) {
+    return res.status(401).json({ error: 'Access denied - no token' });
+  }
+  
+  const jwt = require('jsonwebtoken');
+  const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+  
+  let walletAddress;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    walletAddress = decoded.walletAddress;
+  } catch (err) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
+  
+  const { direction, amount, leverage } = req.body;
   if (!users[walletAddress]) {
     return res.status(404).json({ error: 'User not found' });
   }
@@ -114,4 +131,7 @@ router.get('/history', (req, res) => {
   res.json(userTrades);
 });
 
+// Export leaderboard for other routes
 module.exports = router;
+module.exports.LEADERBOARD = LEADERBOARD;
+module.exports.users = users;
