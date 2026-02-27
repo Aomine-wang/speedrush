@@ -33,12 +33,15 @@ router.post('/', (req, res) => {
     return res.status(403).json({ error: 'Invalid token' });
   }
   
-  const { direction, amount, leverage } = req.body;
-  if (!users[walletAddress]) {
+  const { direction, amount } = req.body;
+
+  // always read latest users object from auth module (avoid stale reference)
+  const usersDb = authModule.users;
+  if (!usersDb || !usersDb[walletAddress]) {
     return res.status(404).json({ error: 'User not found' });
   }
   
-  const user = users[walletAddress];
+  const user = usersDb[walletAddress];
 
   const amt = Number(amount);
   const lev = 10000; // fixed leverage per product rule
@@ -142,7 +145,8 @@ async function settleTrade(trade) {
   trade.refund = Number(refund.toFixed(2));
   trade.settledAt = new Date();
 
-  const user = users[trade.walletAddress];
+  const usersDb = authModule.users;
+  const user = usersDb ? usersDb[trade.walletAddress] : undefined;
   if (user) {
     user.demoBalance += refund;
 
