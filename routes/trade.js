@@ -13,6 +13,7 @@ const vault = vaultModule.vault;
 
 // Place order (handle /trade endpoint)
 router.post('/', (req, res) => {
+  try {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   
@@ -75,6 +76,10 @@ router.post('/', (req, res) => {
     vaultBalance: vault.balance,
     settlementIn: 30
   });
+  } catch (e) {
+    console.error('[trade] error', e);
+    res.status(500).json({ error: 'Internal Server Error', detail: String(e && e.message ? e.message : e) });
+  }
 });
 
 // Settle trade
