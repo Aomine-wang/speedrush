@@ -24,7 +24,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', version: '2.0', timestamp: new Date().toISOString() });
 });
 
 // WebSocket for real-time price and leaderboard
