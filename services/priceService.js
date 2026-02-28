@@ -30,38 +30,44 @@ function start() {
   // initialize global price immediately
   global.currentBTCPrice = currentPrice;
 
-  // Update price every 3 seconds
-  setInterval(simulatePrice, 3000);
-  
-  // In production, connect to Binance WebSocket:
-  // connectBinanceWS();
+  // Use Binance Futures LAST price (aggTrade) instead of simulated ticks
+  connectBinanceWS_LastPrice();
 }
 
-// Connect to Binance WebSocket (for production)
-function connectBinanceWS() {
-  const ws = new WebSocket('wss://fstream.binance.com/ws/btcusdt@markPrice');
+// Connect to Binance Futures WebSocket (LAST price)
+function connectBinanceWS_LastPrice() {
+  const ws = new WebSocket('wss://fstream.binance.com/ws/btcusdt@aggTrade');
   
   ws.on('open', () => {
-    console.log('Connected to Binance');
+    console.log('Connected to Binance Futures (aggTrade last price)');
   });
   
   ws.on('message', (data) => {
     const parsed = JSON.parse(data);
-    currentPrice = parseFloat(parsed.p);
-    
+    // aggTrade: p=price, T=trade time
+    const p = parseFloat(parsed.p);
+    if (!Number.isFinite(p)) return;
+
+    currentPrice = p;
+    global.currentBTCPrice = currentPrice;
+
     if (priceCallback) {
       priceCallback({
         symbol: 'BTCUSDT',
-        price: currentPrice.toFixed(2),
-        change: 0,
-        changePercent: 0,
-        timestamp: Date.now()
+        price: Number(currentPrice.toFixed(2)),
+        timestamp: parsed.T || Date.now(),
+        source: 'binance-futures-aggTrade'
       });
     }
   });
   
   ws.on('error', (err) => {
     console.error('Binance WS error:', err);
+  });
+
+  ws.on('close', () => {
+    console.warn('Binance WS closed, retrying in 2s...');
+    setTimeout(connectBinanceWS_LastPrice, 2000);
   });
 }
 
